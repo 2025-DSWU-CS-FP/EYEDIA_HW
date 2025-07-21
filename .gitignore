@@ -1,1 +1,5 @@
 .DS_Store
+
+data/eye_img/*
+data/eye_video/*
+data/scene_img/*

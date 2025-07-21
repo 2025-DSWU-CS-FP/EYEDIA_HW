@@ -20,6 +20,11 @@ homo_matrix = np.array([
     [0.0, 0.0, 1.0]
 ], dtype=np.float32)
 
+canvas_h, canvas_w = 720, 1280  # 전체 화면 크기
+img_x, img_y = 0, 100         # 그림의 좌상단 위치(더 왼쪽으로 이동)
+img_h, img_w = scene_image.shape[:2]
+canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
+
 # === 함수 정의 ===
 def detect_corneal_reflex(gray):
     _, max_val, _, max_loc = cv2.minMaxLoc(gray)
@@ -77,10 +82,31 @@ def apply_homography(pt, H):
     return int(mapped[0]), int(mapped[1])
 
 # === 메인 루프 ===
+prev_region = None  # 이전 구역 번호 저장 변수
 while True:
     ret, frame_eye = cap_eye.read()
     if not ret:
         break
+    # 캔버스에 그림 배치
+    canvas[:] = 0  # 배경 초기화
+    # 그림이 캔버스 밖으로 나가지 않게 범위 체크
+    y1, y2 = max(img_y, 0), min(img_y+img_h, canvas_h)
+    x1, x2 = max(img_x, 0), min(img_x+img_w, canvas_w)
+    sy1, sy2 = y1-img_y, y2-img_y
+    sx1, sx2 = x1-img_x, x2-img_x
+    canvas[y1:y2, x1:x2] = scene_image[sy1:sy2, sx1:sx2]
+
+    # 그림 위에 4등분 라인 그리기
+    cx = img_x + img_w // 2
+    cy = img_y + img_h // 2
+    cv2.line(canvas, (cx, img_y), (cx, img_y+img_h), (0,255,0), 2)
+    cv2.line(canvas, (img_x, cy), (img_x+img_w, cy), (0,255,0), 2)
+    # 각 사분면 번호 표시
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    cv2.putText(canvas, '1', (img_x+20, img_y+40), font, 1.5, (0,255,0), 3)
+    cv2.putText(canvas, '2', (cx+20, img_y+40), font, 1.5, (0,255,0), 3)
+    cv2.putText(canvas, '3', (img_x+20, cy+40), font, 1.5, (0,255,0), 3)
+    cv2.putText(canvas, '4', (cx+20, cy+40), font, 1.5, (0,255,0), 3)
 
     gray_eye = cv2.cvtColor(frame_eye, cv2.COLOR_BGR2GRAY)
     corneal_center = detect_corneal_reflex(gray_eye)
@@ -95,12 +121,29 @@ while True:
         pupil_center = ellipse[0]
         cv2.ellipse(display_eye, ellipse, (0, 255, 0), 2)
         gaze_point = apply_homography(pupil_center, homo_matrix)
-        cv2.circle(display_scene, gaze_point, 10, (0, 0, 255), -1)
-        print(f"동공 위치: {pupil_center}, 시선 좌표: {gaze_point}")
+        x, y = gaze_point
+        if img_x <= x < img_x + img_w and img_y <= y < img_y + img_h:
+            rel_x = x - img_x
+            rel_y = y - img_y
+            if rel_x < img_w // 2 and rel_y < img_h // 2:
+                region = 1  # 좌상
+            elif rel_x >= img_w // 2 and rel_y < img_h // 2:
+                region = 2  # 우상
+            elif rel_x < img_w // 2 and rel_y >= img_h // 2:
+                region = 3  # 좌하
+            else:
+                region = 4  # 우하
+            print(f"시선이 그림의 {region}영역에 있습니다.")
+            # 캔버스에 시선 표시
+            cv2.circle(canvas, (x, y), 10, (0, 0, 255), -1)
+            # 사분면 텍스트 표시
+            cv2.putText(canvas, f"{region}영역", (img_x+img_w//2-80, img_y+img_h+50), font, 1.5, (0,0,255), 3)
+        else:
+            print("시선이 그림 영역 밖에 있습니다.")
 
     # 결과 시각화
     cv2.imshow("Eye View", display_eye)
-    cv2.imshow("Scene View", display_scene)
+    cv2.imshow("Scene View", canvas)
 
     if cv2.waitKey(30) == 27:  # ESC 키
         break
