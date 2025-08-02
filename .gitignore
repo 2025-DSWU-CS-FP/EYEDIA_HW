@@ -3,3 +3,6 @@
 data/eye_img/*
 data/eye_video/*
 data/scene_img/*
+
+# 캘리브레이션 이미지
+data/calibration/*
