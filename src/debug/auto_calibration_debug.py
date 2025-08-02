@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-VIDEO_PATH = "./data/eye_video/25.07.21yooni.mp4"
+VIDEO_PATH = "./data/eye_video/25.08.02yooni_rasp.mp4"
 
 # 기준 Scene 포인트 (9점)
 SCENE_POINTS = [
@@ -12,15 +12,17 @@ SCENE_POINTS = [
 
 # 각 점별 시간 구간 (초 단위)
 TIME_RANGES = [
-    (0.0, 0.9),
-    (1.0, 3.0),
-    (3.1, 4.0),
-    (5.0, 5.9),
-    (6.0, 6.9),
+    (0.0, 0.5),
+    (0.5, 2.0),
+    (2.8, 4.0),
+
+    (5.0, 6.7),
     (7.0, 7.9),
-    (9.0, 10.0),
-    (11.0, 11.9),
-    (12.0, 12.9)
+    (8.9, 10.5),
+
+    (11.0, 12.2),
+    (12.8, 13.2),
+    (13.8, 14.4)
 ]
 
 def detect_pupil_and_cr(gray):
