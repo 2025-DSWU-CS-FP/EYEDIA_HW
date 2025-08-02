@@ -18,17 +18,8 @@ canvas_h, canvas_w = img_h, img_w
 img_x, img_y = 0, 0  # 그림의 좌상단 위치를 (0, 0)으로
 canvas = np.zeros((canvas_h, canvas_w, 3), dtype=np.uint8)
 
-# === 호모그래피 행렬 (임시 예시 값) ===
-# 실제로는 calibrate.py 등에서 9점 수집 후 생성해야 함
-# homo_matrix = np.array([
-#     [1.1, 0.0, 20.0],
-#     [0.0, 1.1, 10.0],
-#     [0.0, 0.0, 1.0]
-# ], dtype=np.float32)
-homo_matrix = np.array(
-    [[-1.29553522e+00,  3.65791222e-01,  7.16585565e+02],
- [-1.76675632e+00,  5.29925908e-01,  9.68151279e+02],
- [-1.87049677e-03,  6.47580078e-04,  1.00000000e+00]], dtype=np.float32)
+# === auto_calibration에서 생성한 homography 파일을 불러옴 ===
+homo_matrix = np.load('./data/calibration_results/homography.npy')
 
 # === 함수 정의 ===
 def detect_corneal_reflex(gray):
@@ -59,15 +50,17 @@ def detect_pupil_contour(corrected, thresh=30):
                 continue
             x, y, bw, bh = cv2.boundingRect(cnt)
             aspect_ratio = bw / bh
-            if aspect_ratio < 0.3 or aspect_ratio > 3.0:
+            if aspect_ratio < 0.3 or aspect_ratio > 3.0: # if aspect_ratio < 0.3 or aspect_ratio > 3.0:
                 continue
             M = cv2.moments(cnt)
             if M['m00'] == 0:
                 continue
             cx = int(M['m10'] / M['m00'])
             cy = int(M['m01'] / M['m00'])
-            # 동공 중심이 이미지 중앙에서 너무 멀면 제외
-            if abs(cx - w//2) > w//3 or abs(cy - h//2) > h//3:
+            # 동공 중심이 이미지 중앙에서 너무 멀면 제외 if abs(cx - w//2) > w//3 or abs(cy - h//2) > h//3:
+            # 동공 중심이 이미지 중앙에서 멀어도 허용 범위를 넓힘
+            if abs(cx - w//2) > w//3 or abs(cy - h//2) > h//2:
+            
                 continue
             print(f"area: {area}, circularity: {circularity:.2f}, aspect: {aspect_ratio:.2f}, cx: {cx}, cy: {cy}")
             candidates.append(cnt)
