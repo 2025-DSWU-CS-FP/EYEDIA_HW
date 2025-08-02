@@ -4,7 +4,7 @@ import sys
 import os
 
 # === 1. 눈 이미지에서 동공 중심 좌표 수동 추출 ===
-EYE_IMG_DIR = './data/caligration/v2'
+EYE_IMG_DIR = './data/calibration/v2'
 CALIB_WIDTH = 1024  # calibration 이미지 너비 (좌우 반전을 위해 필요)
 
 eye_points = []
