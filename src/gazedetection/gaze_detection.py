@@ -7,7 +7,7 @@ import time
 
 # --- 설정 변수 ---
 # 모드 설정: 'collect' (데이터 수집) 또는 'predict' (실시간 예측)
-MODE = 'collect'
+MODE = 'predict'
 
 ## --- 수정 --- : 화면 구역을 4사분면으로 변경
 SCREEN_ZONES = {

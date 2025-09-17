@@ -7,3 +7,5 @@ data/scene_img/*
 # 캘리브레이션 이미지
 data/calibration/*
 /data/
+
+src/gazedetection/shape_predictor_68_face_landmarks.dat
