@@ -1,0 +1,106 @@
+[
+  {
+    "id": "436499",
+    "objectID": 436499,
+    "title": "Diana the Huntress",
+    "artist": "Giampietrino (Giovanni Pietro Rizzoli)",
+    "summary": "Diana the Huntress. Giampietrino (Giovanni Pietro Rizzoli). . Oil on wood.",
+    "image_path": "data/met_images/image_436499.jpg"
+  },
+  {
+    "id": "436500",
+    "objectID": 436500,
+    "title": "Portrait of a Man, Said to Be John Cecil (1628–1678), Fourth Earl of Exeter",
+    "artist": "Richard Gibson",
+    "summary": "Portrait of a Man, Said to Be John Cecil (1628–1678), Fourth Earl of Exeter. Richard Gibson. ca. 1670. Vellum laid on card.",
+    "image_path": "data/met_images/image_436500.jpg"
+  },
+  {
+    "id": "436501",
+    "objectID": 436501,
+    "title": "Francesca Ghirardi Lechi (1773–1806)",
+    "artist": "Giovanni Battista Gigola",
+    "summary": "Francesca Ghirardi Lechi (1773–1806). Giovanni Battista Gigola. . Ivory.",
+    "image_path": "data/met_images/image_436501.jpg"
+  },
+  {
+    "id": "436502",
+    "objectID": 436502,
+    "title": "The Annunciation",
+    "artist": "Luca Giordano",
+    "summary": "The Annunciation. Luca Giordano. 1672. Oil on canvas.",
+    "image_path": "data/met_images/image_436502.jpg"
+  },
+  {
+    "id": "436503",
+    "objectID": 436503,
+    "title": "The Flight into Egypt",
+    "artist": "Luca Giordano",
+    "summary": "The Flight into Egypt. Luca Giordano. 1701. Oil on canvas.",
+    "image_path": "data/met_images/image_436503.jpg"
+  },
+  {
+    "id": "436504",
+    "objectID": 436504,
+    "title": "The Adoration of the Magi",
+    "artist": "Giotto di Bondone",
+    "summary": "The Adoration of the Magi. Giotto di Bondone. possibly ca. 1320. Tempera on wood, gold ground.",
+    "image_path": "data/met_images/image_436504.jpg"
+  },
+  {
+    "id": "436506",
+    "objectID": 436506,
+    "title": "Madonna and Child with Donors",
+    "artist": "Giovanni da Milano",
+    "summary": "Madonna and Child with Donors. Giovanni da Milano. ca. 1365. Tempera on wood, gold ground.",
+    "image_path": "data/met_images/image_436506.jpg"
+  },
+  {
+    "id": "436508",
+    "objectID": 436508,
+    "title": "Madonna and Child with Saints",
+    "artist": "Giovanni di Paolo (Giovanni di Paolo di Grazia)",
+    "summary": "Madonna and Child with Saints. Giovanni di Paolo (Giovanni di Paolo di Grazia). 1454. Tempera on wood, gold ground.",
+    "image_path": "data/met_images/image_436508.jpg"
+  },
+  {
+    "id": "436509",
+    "objectID": 436509,
+    "title": "The Adoration of the Magi",
+    "artist": "Giovanni di Paolo (Giovanni di Paolo di Grazia)",
+    "summary": "The Adoration of the Magi. Giovanni di Paolo (Giovanni di Paolo di Grazia). ca. 1460. Tempera and gold on wood.",
+    "image_path": "data/met_images/image_436509.jpg"
+  },
+  {
+    "id": "436510",
+    "objectID": 436510,
+    "title": "Madonna and Child with Two Angels and a Donor",
+    "artist": "Giovanni di Paolo (Giovanni di Paolo di Grazia)",
+    "summary": "Madonna and Child with Two Angels and a Donor. Giovanni di Paolo (Giovanni di Paolo di Grazia). ca. 1445. Tempera on wood, gold ground (partly checkered with modern red glazes).",
+    "image_path": "data/met_images/image_436510.jpg"
+  },
+  {
+    "id": "200001",
+    "objectID": 200001,
+    "title": "The Dance Class (무용수업)",
+    "artist": "Edgar Degas",
+    "summary": "The Dance Class (무용수업). Edgar Degas. 1874. Oil on Canvas. French",
+    "image_path": "data/met_images/image_20001.jpg"
+  },
+  {
+    "id": "200002",
+    "objectID": 200002,
+    "title": "Woman with a Parasol (양산을 쓴 여인)",
+    "artist": "Claude Monet",
+    "summary": "Woman with a Parasol (양산을 쓴 여인). Claude Monet. 1875. Oil on Canvas. French",
+    "image_path": "data/met_images/image_20002.jpg"
+  },
+  {
+    "id": "200003",
+    "objectID": 200003,
+    "title": "The Card Sharp with the Ace of Diamonds (다이아몬드 에이스를 가진 사기꾼)",
+    "artist": "Georges de La Tour",
+    "summary": "The Card Sharp with the Ace of Diamonds (다이아몬드 에이스를 가진 사기꾼). Georges de La Tour. 1630. Oil on Canvas. French",
+    "image_path": "data/met_images/image_20003.jpg"
+  }
+]
