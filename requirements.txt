@@ -19,4 +19,5 @@ joblib==1.4.2
 matplotlib==3.9.2
 
 # For JSON logging and pretty prints
+
 rich==13.7.1
