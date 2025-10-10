@@ -1,0 +1,22 @@
+
+# Core dependencies
+requests==2.32.3
+opencv-python==4.10.0.84
+numpy==1.26.4
+
+# Event input handling (USB remote controller)
+evdev==1.7.1
+
+# Face landmark & gaze detection
+dlib==19.24.4
+joblib==1.4.2
+
+# Optional: for installing dlib on Jetson, use system packages first:
+# sudo apt-get install -y libboost-all-dev cmake python3-dev
+
+
+# For debugging and image visualization
+matplotlib==3.9.2
+
+# For JSON logging and pretty prints
+rich==13.7.1
