@@ -1,0 +1,43 @@
+# =====================================
+# EYEDIA Smart Eyewear - Requirements
+# =====================================
+# Python dependencies for the controller and gaze detection modules
+# Works on Ubuntu, Jetson, LattePanda (Windows/Linux)
+# -------------------------------------
+
+# Core AI/ML + Vision
+opencv-python==4.10.0.84
+numpy==1.26.4
+dlib==19.24.4
+scikit-learn==1.5.2
+joblib==1.4.2
+
+# Device control
+evdev==1.7.1         # for remote controller input (Linux only)
+requests==2.32.3     # for HTTP calls to model server
+
+# Optional (debug / visualization)
+matplotlib==3.9.2
+rich==13.7.1
+
+# =====================================
+# 📦 Additional Notes
+# =====================================
+# 1️⃣ For dlib installation, install these system libraries first (Ubuntu/Debian):
+#     sudo apt-get update
+#     sudo apt-get install -y build-essential cmake libboost-all-dev python3-dev
+
+# 2️⃣ Download Dlib facial landmark model (manual step):
+#     wget http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
+#     bzip2 -d shape_predictor_68_face_landmarks.dat.bz2
+#
+#     Then place the extracted file in the same folder as:
+#       - gaze_detection.py
+#       - eyedia_controller.py
+#
+#     Final path example:
+#       ~/eyedia/shape_predictor_68_face_landmarks.dat
+#
+# 3️⃣ (Optional) If running on LattePanda Windows:
+#     pip install opencv-python dlib scikit-learn joblib numpy requests
+#     # evdev is Linux-only, skip it on Windows.
