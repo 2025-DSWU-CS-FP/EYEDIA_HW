@@ -75,7 +75,7 @@ def send_quadrant(q: str):
     """선택된 작품이 있어야 Q 전송 가능"""
     if current_art_id is None:
 
-                    
+                           host 
         log("⚠️ 먼저 작품을 선택하세요 (TAB=200001, UP=200002). Q 전송 취소.")
         return
     post_process_image({"art_id": current_art_id, "q": q}, tag=f"Q({q})")
