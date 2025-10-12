@@ -1,11 +1,12 @@
 # gazedetection.py
+import os
 import cv2
 import dlib
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 import joblib
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 # ── 기본 설정
 SCREEN_ZONES = {1: "Top-Left", 2: "Top-Right", 3: "Bot-Left", 4: "Bot-Right"}
@@ -183,14 +184,29 @@ def predict_zone(frame_bgr: np.ndarray) -> Optional[int]:
         pass
     return None
 
+# ──────────────────────────────────────────────────────────────
+# 카메라 열기 도우미 (index 또는 경로 모두 지원, 기본 /dev/video2)
+# ──────────────────────────────────────────────────────────────
+def _open_capture(src: Union[int, str, Path]) -> cv2.VideoCapture:
+    """
+    src가 정수면 인덱스로, 문자열/Path면 장치 경로로 열기.
+    V4L2 백엔드 사용을 강제.
+    """
+    if isinstance(src, (str, Path)):
+        src = str(src)
+        cap = cv2.VideoCapture(src, cv2.CAP_V4L2)
+    else:
+        cap = cv2.VideoCapture(int(src), cv2.CAP_V4L2)
+    return cap
 
 # ──────────────────────────────────────────────────────────────
-# 아래는 '수집/학습/시연'을 위한 간단한 CLI (원하면 사용)
+# '수집/학습/시연'을 위한 간단한 CLI
 # ──────────────────────────────────────────────────────────────
-def _run_collect_and_train():
+def _run_collect_and_train(cam_src: Union[int, str, Path]):
     print("--- 데이터 수집 모드 (자동 진행) ---")
     print(f"각 구역을 응시한 상태에서 '스페이스바'를 눌러 데이터를 {SAMPLES_PER_ZONE}개씩 수집합니다.")
     print("수집 완료 시 's'를 눌러 학습/저장합니다.")
+    print(f"📷 Using camera: {cam_src}")
 
     detector = dlib.get_frontal_face_detector()
     sp_path = _resolve_path("shape_predictor_68_face_landmarks.dat")
@@ -203,11 +219,16 @@ def _run_collect_and_train():
     current_zone_to_collect = 1
     collected_counts = {i: 0 for i in range(1, 5)}
 
-    cap = cv2.VideoCapture(0)
+    cap = _open_capture(cam_src)
+    if not cap.isOpened():
+        print("❌ 카메라를 열 수 없습니다. 경로/인덱스를 확인하세요.")
+        return
+
     try:
         while True:
             ret, frame = cap.read()
             if not ret:
+                print("❌ 프레임을 읽지 못했습니다.")
                 break
 
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -254,13 +275,18 @@ def _run_collect_and_train():
         cap.release()
         cv2.destroyAllWindows()
 
-def _run_predict_demo():
+def _run_predict_demo(cam_src: Union[int, str, Path]):
     print("--- 실시간 예측 데모 (predict_zone 사용) ---")
-    cap = cv2.VideoCapture(0)
+    print(f"📷 Using camera: {cam_src}")
+    cap = _open_capture(cam_src)
+    if not cap.isOpened():
+        print("❌ 카메라를 열 수 없습니다. 경로/인덱스를 확인하세요.")
+        return
     try:
         while True:
             ret, frame = cap.read()
             if not ret:
+                print("❌ 프레임을 읽지 못했습니다.")
                 break
             zone = predict_zone(frame)
             text = f"Gaze Prediction: Zone {zone}" if zone else "Gaze Prediction: (None)"
@@ -274,11 +300,32 @@ def _run_predict_demo():
 
 if __name__ == "__main__":
     import argparse
+
+    default_cam = (
+    os.getenv("EYE_CAM")
+    or os.getenv("CAM_DEV")
+    or ("/dev/video-eye" if os.path.exists("/dev/video-eye") else None)
+    or ("/dev/v4l/by-id/usb-Generic_USB2.0_PC_CAMERA-video-index0"
+        if os.path.exists("/dev/v4l/by-id/usb-Generic_USB2.0_PC_CAMERA-video-index0") else None)
+    or "/dev/video2"
+    )
     p = argparse.ArgumentParser()
     p.add_argument("--mode", choices=["collect", "demo"], default="demo")
+    p.add_argument(
+        "--cam",
+        default=default_cam,
+        help="카메라 인덱스(예: 0) 또는 장치 경로(예: /dev/video2, /dev/v4l/by-id/...)"
+    )
     args = p.parse_args()
 
-    if args.mode == "collect":
-        _run_collect_and_train()
+    # 숫자로 들어오면 int로, 아니면 문자열 경로로 사용
+    cam_src: Union[int, str]
+    if isinstance(args.cam, str) and args.cam.isdigit():
+        cam_src = int(args.cam)
     else:
-        _run_predict_demo()
+        cam_src = args.cam  # path
+
+    if args.mode == "collect":
+        _run_collect_and_train(cam_src)
+    else:
+        _run_predict_demo(cam_src)
