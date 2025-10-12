@@ -1,0 +1,28 @@
+*   [33m544519a[m[33m ([m[1;31morigin/main[m[33m)[m ➕Docs : requirements.txt 파일 추가
+[31m|[m[32m\[m  
+[31m|[m * [33m5eb00cb[m[33m ([m[1;31morigin/feat/remote-controller[m[33m, [m[1;31morigin/documents/requirements[m[33m)[m ➕Docs : requirements.txt 파일 추가
+[31m|[m * [33m0509716[m ➕Docs : requirements.txt 파일 추가
+[31m|[m * [33ma48ede5[m Create requirements.txt
+[31m|[m * [33m99da6ef[m[33m ([m[1;31morigin/feat/gaze-prediction-9-zones-2[m[33m)[m ✨ Feat: Update gaze model
+[31m|[m * [33ma6e9cf1[m ✨ Feat: Add gaze model and configure Git FLS
+[31m|[m * [33mf441d80[m ✨ Feat: 눈동자 위치 계산
+[31m|[m * [33m845c46c[m Feat: 4사분면 및 자동 20장 수집 기능으로 수정
+[31m|[m * [33md0208b9[m[33m ([m[1;31morigin/feat/gaze-prediction-9-zones[m[33m)[m add 9 zones detection
+[31m|[m[31m/[m  
+*   [33md9e24c9[m 4분할 그림의 어디를 보는 지 알기위한 시선 추적
+[33m|[m[34m\[m  
+[33m|[m *   [33me36a0e5[m[33m ([m[1;31morigin/feat/pufil-detection[m[33m)[m Merge branch 'main' into feat/pufil-detection
+[33m|[m [35m|[m[33m\[m  
+[33m|[m [35m|[m[33m/[m  
+[33m|[m[33m/[m[35m|[m   
+* [35m|[m   [33md63929c[m 코드래빗 설정
+[1;31m|[m[1;32m\[m [35m\[m  
+[1;31m|[m * [35m|[m [33mfa49098[m[33m ([m[1;31morigin/config/2-coderabbit[m[33m)[m 🔧 Config: coderabbit yml 작성
+[1;31m|[m * [35m|[m [33m3f8b491[m 🔧 Config: gitignore에 데이터 경로 추가
+[1;31m|[m[1;31m/[m [35m/[m  
+[1;31m|[m * [33m80417f3[m ✨ Feat: TL, TR, BL, BR 영역 시선 추적 초기 코드 구현
+[1;31m|[m * [33m02b9c1d[m ⚡️ Debug: 호모그래피, 캘리브래이션 디버그 코드
+[1;31m|[m * [33m58a3a7f[m 🗃️ Data: 호모그래피 생성 경로 설정을 위한 임시 파일
+[1;31m|[m * [33md70007d[m ✨ Feat: 호모그래피 행렬 계산
+[1;31m|[m * [33mc7cf4fe[m ✨ Feat: 시선 추적 구현
+[1;31m|[m * [33mbe55bd0[m 🔧 Config: gitignore에 캘리브레이션 용 테스트 이미지 경로 추가
