@@ -33,7 +33,7 @@ MODEL_URL      = "http://3.34.240.201:8000"
 
 # 카메라 경로
 SCENE_CAM_PATH = "/dev/v4l/by-id/usb-046d_HD_Pro_Webcam_C920_E03BCAAF-video-index0"  # 작품 카메라
-EYE_CAM_PATH   = "/dev/video2"  # 눈동자 카메라 (환경에 따라 수정 가능)
+EYE_CAM_PATH   = "/dev/v4l/by-id/usb-Generic_USB2.0_PC_CAMERA-video-index0"  # 눈동자 카메라 (환경에 따라 수정 가능)
 HID_DEVICE     = "/dev/input/by-id/usb-1d57_ad02-event-kbd"
 
 REQUEST_TIMEOUT = 5.0
