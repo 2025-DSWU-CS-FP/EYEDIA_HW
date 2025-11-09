@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-# eyedia_dualcam_remote.pyV
-# TAB   → detect-art    → POST http://3.34.240.201:8000/process-image?art_id=...
-# ENTER → detect-area   → POST http://3.34.240.201:8000/process-image?art_id=...&q=Qn
-# 1~4   → Q1~Q4 수동 전환, Q/ESC → 종료
+# eyedia_dualcam_remote_gaze.py
+# 듀얼 카메라(Scene, Eye)와 리모컨 입력을 사용하는 스크립트
+#
+# [키 매핑]
+# - TAB   → detect-art    → POST /process-image?art_id=...
+# - ENTER → detect-area   → POST /process-image?art_id=...&q=Qn (Gaze model)
+# - 1~4   → Q1~Q4 수동 변경 (Gaze 모델 테스트 및 비상용)
+# - Q     → 종료
 
 import os
 import cv2
 import time
 import json
-import faiss
-import torch
 import queue
+import torch
 import threading
 import requests
 import numpy as np
-from typing import Tuple, Optional, Dict, Any
 from PIL import Image
 from ultralytics import YOLO
 from transformers import CLIPProcessor, CLIPModel
@@ -24,97 +26,52 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"  # OpenMP 충돌 방지
 # =========================
 # 환경설정
 # =========================
-YOLO_WEIGHTS   = "best.pt"  # 우리가 학습한 가중치
-CLIP_ID        = "openai/clip-vit-base-patch32"
-FAISS_INDEX    = "./faiss/met_text.index"
-FAISS_META     = "./faiss/met_structured_with_objects.json"
+YOLO_WEIGHTS = "/home/eyedia/Downloads/EYEDIA_MODEL-feat-68-integration/scripts/gazedetection/best.pt"
+CLIP_ID = "openai/clip-vit-base-patch32"
+FAISS_INDEX = "faiss/met_text.index"
+FAISS_META = "faiss/met_structured_with_objects.json"
+MODEL_URL = "http://3.34.240.201:8000"
 
-MODEL_URL      = "http://3.34.240.201:8000"         
-
-# 카메라 경로
-SCENE_CAM_PATH = "/dev/v4l/by-id/usb-046d_HD_Pro_Webcam_C920_E03BCAAF-video-index0"  # 작품 카메라
-EYE_CAM_PATH   = "/dev/v4l/by-id/usb-Generic_USB2.0_PC_CAMERA-video-index0"  # 눈동자 카메라 (환경에 따라 수정 가능)
-HID_DEVICE     = "/dev/input/by-id/usb-1d57_ad02-event-kbd"
+SCENE_CAM_PATH = "/dev/video0"
+EYE_CAM_PATH = "/dev/video2"
+HID_DEVICE = "/dev/input/by-id/usb-1d57_ad02-event-kbd"
 
 REQUEST_TIMEOUT = 5.0
+GAZE_MODEL_PATH = "scripts/gazedetection/3-best.pt"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # =========================
-# 모델/인덱스 로드
+# 모델 로드
 # =========================
-print("🚀 Load models...")
+print("🚀 Loading models...")
 yolo_model = YOLO(YOLO_WEIGHTS)
 clip_model = CLIPModel.from_pretrained(CLIP_ID)
 clip_processor = CLIPProcessor.from_pretrained(CLIP_ID)
 
-index = faiss.read_index(FAISS_INDEX)
-with open(FAISS_META, "r", encoding="utf-8") as f:
-    image_meta = json.load(f)
-
-# =========================
-# gaze 모듈
-# =========================
+# Gaze model (YOLOv8 4-class classification)
 try:
-    import gaze_detection as gd
-    HAS_GAZE = True
+    gaze_model = YOLO(GAZE_MODEL_PATH)
+    print(f"✅ Gaze model loaded: {GAZE_MODEL_PATH}")
 except Exception as e:
-    print(f"[INFO] gaze_detection 불러오기 실패(폴백): {e}")
-    HAS_GAZE = False
+    print(f"[ERROR] Failed to load gaze model: {e}")
+    gaze_model = None
+
+# FAISS 로드
+try:
+    import faiss
+
+    index = faiss.read_index(FAISS_INDEX)
+    with open(FAISS_META, "r", encoding="utf-8") as f:
+        image_meta = json.load(f)
+except Exception as e:
+    print(f"[WARN] FAISS load 실패: {e}")
+    index, image_meta = None, []
 
 # =========================
 # 유틸 함수
 # =========================
-def open_eye_cam():
-    # 1) 먼저 V4L2 경로
-    cap = cv2.VideoCapture("/dev/video2", cv2.CAP_V4L2)
-    if cap.isOpened():
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"YUYV"))
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
-        cap.set(cv2.CAP_PROP_FPS, 15)  # 보수적 시작
-        try: cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        except Exception: pass
-        for _ in range(15): cap.read()
-        ok, _ = cap.read()
-        if ok:
-            print("🎥 EYE V4L2 OK (YUYV 640x480@15)")
-            return cap
-        cap.release()
-
-    # 2) 실패 시 GStreamer 우회
-    gst = ("v4l2src device=/dev/video2 io-mode=2 do-timestamp=true ! "
-           "video/x-raw,format=YUY2,width=640,height=480,framerate=15/1 ! "
-           "videoconvert ! appsink drop=true max-buffers=1 sync=false")
-    cap = cv2.VideoCapture(gst, cv2.CAP_GSTREAMER)
-    if cap.isOpened():
-        for _ in range(10): cap.read()
-        ok, _ = cap.read()
-        if ok:
-            print("🎥 EYE GST OK (YUY2→appsink)")
-            return cap
-
-    return None
-
-def open_capture_strict(dev, prefer="MJPG", size=(640, 480), fps=30):
-    cap = cv2.VideoCapture(dev, cv2.CAP_V4L2)
-    if not cap.isOpened():
-        return None
-
-    try_list = [prefer, "YUYV"] if prefer == "MJPG" else ["YUYV", "MJPG"]
-    for fourcc in try_list:
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*fourcc))
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH,  size[0])
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, size[1])
-        cap.set(cv2.CAP_PROP_FPS, fps)
-        for _ in range(10):
-            cap.read()
-        ok, _ = cap.read()
-        if ok:
-            print(f"🎥 Opened {dev} with {fourcc} {size[0]}x{size[1]}@{fps}")
-            return cap
-    cap.release()
-    return None
-
 def embed_crop(image_bgr):
+    """BGR 이미지를 CLIP 임베딩 벡터로 변환 (FAISS 검색용)"""
     rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     pil = Image.fromarray(rgb)
     inputs = clip_processor(images=pil, return_tensors="pt", padding=True)
@@ -123,12 +80,14 @@ def embed_crop(image_bgr):
         emb = emb / emb.norm(p=2, dim=-1, keepdim=True)
     return emb[0].cpu().numpy().astype("float32")
 
+
 def choose_best_box(results):
+    """YOLO 탐지 결과 중 가장 점수가 높은 박스를 선택"""
     best = None
     for b in results.boxes:
         x1, y1, x2, y2 = map(int, b.xyxy[0].tolist())
         conf = float(b.conf[0]) if hasattr(b, "conf") else 0.0
-        w, h = max(0, x2-x1), max(0, y2-y1)
+        w, h = max(0, x2 - x1), max(0, y2 - y1)
         if w == 0 or h == 0:
             continue
         score = conf * np.sqrt(w * h)
@@ -136,7 +95,9 @@ def choose_best_box(results):
             best = (x1, y1, x2, y2, score)
     return best
 
+
 def detect_art_id(frame_bgr):
+    """YOLO 탐지 → FAISS 검색 → art_id 반환"""
     res = yolo_model(frame_bgr, verbose=False)[0]
     best = choose_best_box(res)
     if not best:
@@ -145,68 +106,102 @@ def detect_art_id(frame_bgr):
     crop = frame_bgr[y1:y2, x1:x2]
     if crop.size == 0:
         return None
-    qv = embed_crop(crop).reshape(1, -1)
-    D, I = index.search(qv, k=1)
-    idx = int(I[0][0])
-    art_id = str(image_meta[idx]["full_image_id"])
-    return art_id, (x1, y1, x2, y2), score, float(D[0][0])
 
-def get_gaze_q(eye_frame_bgr, fallback_q="Q2"):
-    if not HAS_GAZE:
-        return fallback_q
-    try:
-        zone = gd.predict_zone(eye_frame_bgr)
-        if zone in (1, 2, 3, 4):
-            return f"Q{zone}"
-    except Exception as e:
-        print(f"[WARN] gaze 예측 실패: {e}")
-    return fallback_q
+    # FAISS 검색 
+    if index:
+        qv = embed_crop(crop).reshape(1, -1)
+        D, I = index.search(qv, k=1)
+        idx = int(I[0][0])
+        art_id = str(image_meta[idx]["full_image_id"])
+    else:
+        art_id = "UNKNOWN"
 
-def post_model_detect(art_id):
-    url = f"{MODEL_URL}/process-image?art_id={art_id}"
-    try:
-        r = requests.post(url, timeout=REQUEST_TIMEOUT)
-        print(f"🎯 detect-art 전송 완료: {r.status_code}")
-        return r
-    except requests.RequestException as e:
-        print(f"[WARN] 요청 실패: {e}")
-        return None
+    return art_id, (x1, y1, x2, y2), score
 
-def post_model_detect_area(art_id, q):
-    url = f"{MODEL_URL}/process-image?art_id={art_id}&q={q}"
-    try:
-        r = requests.post(url, timeout=REQUEST_TIMEOUT)
-        print(f"🗺️ detect-area 전송 완료: {r.status_code}")
-        return r
-    except requests.RequestException as e:
-        print(f"[WARN] 요청 실패: {e}")
-        return None
 
 def draw_box(frame, box, color, text):
+    """OpenCV 프레임에 사각형과 텍스트 표시"""
     x1, y1, x2, y2 = box
     cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-    cv2.putText(frame, text, (x1, max(0, y1-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+    cv2.putText(frame, text, (x1, max(0, y1 - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+
+
+def get_gaze_q(frame_bgr, fallback_q="Q2"):
+    """Gaze 모델로 4사분면 Q값 예측"""
+    if gaze_model is None:
+        print("[WARN] Gaze model not loaded, fallback.")
+        return fallback_q
+    try:
+        results = gaze_model(frame_bgr, verbose=False)
+        res = results[0]
+        pred_idx = res.probs.top1
+        class_name = res.names[pred_idx]    
+        q = class_name.upper()
+        if q in ("Q1", "Q2", "Q3", "Q4"):
+            # 
+            if q=="Q1":
+                return "Q2"
+            if q=="Q2":
+                return "Q1"
+            if q=="Q3":
+                return "Q4"
+            if q=="Q4":
+                return "Q3"
+
+            # return q
+        print(f"[WARN] Gaze: 알 수 없는 클래스 이름: {class_name}")
+        return fallback_q
+    except Exception as e:
+        print(f"[WARN] Gaze prediction failed: {e}")
+        return fallback_q
+
+
+def post_model_detect(art_id):
+    """art_id만 서버로 전송 (/detect-art)"""
+    try:
+        r = requests.post(f"{MODEL_URL}/process-image?art_id={art_id}", timeout=REQUEST_TIMEOUT)
+        print(f"🎯 detect-art sent: {r.status_code}")
+    except Exception as e:
+        print(f"[WARN] detect-art failed: {e}")
+
+
+def post_model_detect_area(art_id, q):
+    """art_id + Q값 서버 전송 (/detect-area)"""
+    try:
+        r = requests.post(f"{MODEL_URL}/process-image?art_id={art_id}&q={q}", timeout=REQUEST_TIMEOUT)
+        print(f"🗺️ detect-area sent: {r.status_code}")
+    except Exception as e:
+        print(f"[WARN] detect-area failed: {e}")
+
+
+def open_capture(dev, size=(640, 480), fps=30):
+    """지정된 경로의 카메라 열기"""
+    cap = cv2.VideoCapture(dev)
+    if not cap.isOpened():
+        return None
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, size[0])
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, size[1])
+    cap.set(cv2.CAP_PROP_FPS, fps)
+    for _ in range(10):
+        cap.read()
+    ok, _ = cap.read()
+    if ok:
+        return cap
+    cap.release()
+    return None
+
 
 # =========================
-# HID 리더
+# HID / 콘솔 입력
 # =========================
 class KeyEvent:
     TAB, ENTER, Q, NUM1, NUM2, NUM3, NUM4 = "TAB", "ENTER", "Q", "1", "2", "3", "4"
 
+
 def hid_reader(dev_path, out_q):
+    """리모컨(HID) 입력을 큐로 전달"""
     try:
         import evdev
-    except Exception:
-        print("[INFO] evdev 미설치/권한 문제 → 콘솔 폴백.")
-        while True:
-            key = input("키 [tab/enter/1/2/3/4/q]: ").strip().lower()
-            if key == "tab": out_q.put(KeyEvent.TAB)
-            elif key == "enter": out_q.put(KeyEvent.ENTER)
-            elif key in ("1", "2", "3", "4"): out_q.put(key)
-            elif key == "q": out_q.put(KeyEvent.Q); break
-        return
-
-    try:
         device = evdev.InputDevice(dev_path)
         print(f"🔌 HID 연결: {device.path} ({device.name})")
         for event in device.read_loop():
@@ -216,36 +211,44 @@ def hid_reader(dev_path, out_q):
             if key_event.keystate != evdev.KeyEvent.key_down:
                 continue
             code = key_event.scancode
-            if code == evdev.ecodes.KEY_TAB: out_q.put(KeyEvent.TAB)
-            elif code in (evdev.ecodes.KEY_ENTER, evdev.ecodes.KEY_KPENTER): out_q.put(KeyEvent.ENTER)
-            elif code == evdev.ecodes.KEY_1: out_q.put(KeyEvent.NUM1)
-            elif code == evdev.ecodes.KEY_2: out_q.put(KeyEvent.NUM2)
-            elif code == evdev.ecodes.KEY_3: out_q.put(KeyEvent.NUM3)
-            elif code == evdev.ecodes.KEY_4: out_q.put(KeyEvent.NUM4)
-            elif code == evdev.ecodes.KEY_Q: out_q.put(KeyEvent.Q); break
-    except FileNotFoundError:
-        print(f"[WARN] HID 장치 없음: {dev_path} → 콘솔 폴백.")
+            if code == evdev.ecodes.KEY_TAB:
+                out_q.put(KeyEvent.TAB)
+            elif code in (evdev.ecodes.KEY_ENTER, evdev.ecodes.KEY_KPENTER):
+                out_q.put(KeyEvent.ENTER)
+            elif code == evdev.ecodes.KEY_1:
+                out_q.put(KeyEvent.NUM1)
+            elif code == evdev.ecodes.KEY_2:
+                out_q.put(KeyEvent.NUM2)
+            elif code == evdev.ecodes.KEY_3:
+                out_q.put(KeyEvent.NUM3)
+            elif code == evdev.ecodes.KEY_4:
+                out_q.put(KeyEvent.NUM4)
+            elif code == evdev.ecodes.KEY_Q:
+                out_q.put(KeyEvent.Q)
+                break
+    except Exception:
+        print("[INFO] HID 없음/권한 문제 → 콘솔 입력 폴백.")
         while True:
             key = input("키 [tab/enter/1/2/3/4/q]: ").strip().lower()
-            if key == "tab": out_q.put(KeyEvent.TAB)
-            elif key == "enter": out_q.put(KeyEvent.ENTER)
-            elif key in ("1", "2", "3", "4"): out_q.put(key)
-            elif key == "q": out_q.put(KeyEvent.Q); break
+            if key == "tab":
+                out_q.put(KeyEvent.TAB)
+            elif key == "enter":
+                out_q.put(KeyEvent.ENTER)
+            elif key in ("1", "2", "3", "4"):
+                out_q.put(key)
+            elif key == "q":
+                out_q.put(KeyEvent.Q)
+                break
+
 
 # =========================
-# 메인
+# 메인 루프
 # =========================
 def main():
-    print("✅ EYEDIA Dual-Cam Remote")
-    print(f"   YOLO: {YOLO_WEIGHTS}")
-    print(f"   MODEL_URL: {MODEL_URL}")
-    print(f"   SCENE_CAM: {SCENE_CAM_PATH}")
-    print(f"   EYE_CAM  : {EYE_CAM_PATH}")
-    print(f"   HID_DEVICE: {HID_DEVICE}")
+    print("✅ EYEDIA Dual-Cam Remote (Gaze Model)")
 
-    scene = open_capture_strict(SCENE_CAM_PATH, prefer="MJPG", size=(1280, 720), fps=30)
-    eye = open_eye_cam()
-
+    scene = open_capture(SCENE_CAM_PATH, size=(1280, 720), fps=30)
+    eye = open_capture(EYE_CAM_PATH, size=(320, 240), fps=15)
     if not scene or not eye:
         print("[ERROR] 카메라를 열 수 없습니다.")
         return
@@ -269,46 +272,54 @@ def main():
             except queue.Empty:
                 key = None
 
+            # 수동 Q 변경
             if key in ("1", "2", "3", "4"):
                 selected_q = f"Q{key}"
                 print(f"[MANUAL] Q → {selected_q}")
+
+            # 종료
             if key == KeyEvent.Q:
                 print("👋 종료(Q).")
                 break
 
+            # TAB → detect-art
             if key == KeyEvent.TAB:
                 print("▶ TAB: detect-art")
                 out = detect_art_id(scene_frame)
                 if out:
-                    art_id, box, conf_like, dist = out
+                    art_id, box, conf = out
                     draw_box(scene_frame, box, (255, 0, 0), f"art:{art_id}")
                     overlay = f"ART {art_id}"
                     post_model_detect(art_id)
 
+            # ENTER → detect-area
             if key == KeyEvent.ENTER:
-                print("▶ ENTER: detect-area")
-                auto_q = get_gaze_q(eye_frame, selected_q)
+                print("▶ ENTER: detect-area (Gaze)")
+                auto_q = get_gaze_q(eye_frame, fallback_q=selected_q)
                 if auto_q != selected_q:
                     selected_q = auto_q
                     print(f"[GAZE] Q → {selected_q}")
-                print(f"[REQ]WILL SEND Q = {selected_q}")
+
                 out = detect_art_id(scene_frame)
                 if out:
-                    art_id, box, conf_like, dist = out
+                    art_id, box, conf = out
                     draw_box(scene_frame, box, (0, 255, 255), f"art:{art_id} {selected_q}")
                     overlay = f"AREA {art_id} {selected_q}"
                     post_model_detect_area(art_id, selected_q)
 
+            # 화면 출력
             info = f"Q:{selected_q} | {overlay}"
             cv2.putText(scene_frame, info, (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (220, 220, 255), 2)
             cv2.imshow("Scene (Artwork)", scene_frame)
             cv2.imshow("Eye (Tracking)", eye_frame)
+
             if (cv2.waitKey(1) & 0xFF) == 27:
                 break
     finally:
         scene.release()
         eye.release()
         cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()
